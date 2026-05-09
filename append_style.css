@@ -1,0 +1,13 @@
+.stat-list .is-locked dt {
+  color: rgba(255, 255, 255, 0.4);
+}
+.stat-list .is-locked .locked-hint {
+  font-size: 11px;
+  color: #ff6b6b;
+  opacity: 0.9;
+}
+.lock-icon {
+  font-size: 12px;
+  margin-left: 4px;
+  opacity: 0.6;
+}
