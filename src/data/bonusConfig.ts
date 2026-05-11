@@ -1,97 +1,88 @@
-import type { MaidBonus } from '../types'
+import type { MaidBonus, Maid } from '../types'
 
-export interface BonusTemplate {
-  name: string
-  description: string
-  unit: string
-  isGrowth: boolean
-  scale: number
-  discrete?: boolean
+/**
+ * 提取局外成长属性的定义。
+ * 围绕“搜”、“打”、“撤”以及“背包功能”设计的女仆特长。
+ */
+export const BONUS_DICTIONARY: Record<string, Omit<MaidBonus, 'milestones'>> = {
+  lucky_loot: {
+    name: '拾荒直觉',
+    description: '搜索容器时，获得高价值战利品的概率提升',
+    unit: '%',
+    growthValue: 0
+  },
+  death_delivery: {
+    name: '死神速递',
+    description: '撤离失败被击败时，背包内物品保留的概率增加',
+    unit: '%',
+    growthValue: 0
+  },
+  value_slots: {
+    name: '暗格专家',
+    description: '增加安全箱（保险箱）的初始容量',
+    unit: '格',
+    growthValue: 0
+  },
+  quick_loot: {
+    name: '雷厉风行',
+    description: '搜索容器和尸体所需的读条时间减少',
+    unit: '%',
+    growthValue: 0
+  },
+  loot_vision: {
+    name: '鹰眼雷达',
+    description: '进入新房间时，自动标记周围的高级战利品容器',
+    unit: 'none',
+    growthValue: 0
+  },
+  backpack_plus: {
+    name: '负重训练',
+    description: '增加战力背包系统最大负重量，减少超重惩罚',
+    unit: 'kg',
+    growthValue: 0
+  }
 }
 
-export const BONUS_DICTIONARY: Record<string, BonusTemplate> = {
-  max_hp: { name: '最大生命值', description: '提升队伍成员的最大生命值', unit: '%', isGrowth: true, scale: 2 },
-  atk_base: { name: '基础攻击力', description: '提升队伍成员的基础攻击力', unit: '%', isGrowth: true, scale: 2 },
-  def_base: { name: '基础防御力', description: '提升队伍成员的基础防御力', unit: '%', isGrowth: true, scale: 1.5 },
-  crit_rate: { name: '暴击率提升', description: '提升攻击时的暴击概率', unit: '%', isGrowth: false, scale: 0.5 },
-  crit_dmg: { name: '暴击伤害提升', description: '提升暴击时造成的伤害', unit: '%', isGrowth: true, scale: 3 },
-  dodge_rate: { name: '闪避率提升', description: '提升受到攻击时的闪避概率', unit: '%', isGrowth: false, scale: 0.5 },
-  revive: { name: '绝境逢生', description: '生命值归零时，回复一定百分比的生命值（单局限1次）', unit: '%', isGrowth: true, scale: 5 },
-  battle_frenzy: { name: '战意激增', description: '每击败一名敌人，攻击力临时提升', unit: '%', isGrowth: true, scale: 0.5 },
-  boss_killer: { name: '首领特攻', description: '对精英和首领敌人造成的伤害增加', unit: '%', isGrowth: true, scale: 2.5 },
-  backpack_size: { name: '背包扩容', description: '局内背包初始格子数增加', unit: '格', isGrowth: false, scale: 1, discrete: true },
-  backpack_double: { name: '高价槽位', description: '局内背包的双倍结算格子数增加', unit: '格', isGrowth: false, scale: 1, discrete: true },
-  death_delivery: { name: '死神快递', description: '探索阵亡时，可保留带回局外物资的百分比提升', unit: '%', isGrowth: true, scale: 5 },
-  gold_rush: { name: '淘金热', description: '局内掉落的金币数量提升', unit: '%', isGrowth: true, scale: 3 }
-}
-
-import maidsCsv from '../../configs/maids.csv?raw'
-
-// 解析 CSV 配置到 MAPPING 表中
-export const MAID_BONUS_MAPPING: Record<string, string[]> = {}
-
-// configs/maids.csv format: id,name,profession,rarity,element,base_hp,base_atk,base_def,description,bonus_1,bonus_2,bonus_3
-const lines = maidsCsv.trim().split('\n')
-const headers = lines[0].trim().split(',')
-const b1Idx = headers.indexOf('bonus_1')
-const b2Idx = headers.indexOf('bonus_2')
-const b3Idx = headers.indexOf('bonus_3')
-const idIdx = headers.indexOf('id')
-
-for (let i = 1; i < lines.length; i++) {
-  const line = lines[i].trim()
-  if (!line) continue
-  
-  const cols = line.split(',')
-  // The description column might contain commas (but here we just slice from right because bonus is at the end, or use simple split if no quotes are used)
-  // Let's assume standard trailing cols
-  const len = cols.length
-  const bonus3 = cols[len - 1]
-  const bonus2 = cols[len - 2]
-  const bonus1 = cols[len - 3]
-  
-  // The id is always the first col (1001, etc.). In mock data it is "maid_001".
-  const maidIdNumber = cols[idIdx].trim()
-  const maidId = `maid_${String(Number(maidIdNumber) - 1000).padStart(3, '0')}` // map 1001 to maid_001
-
-  MAID_BONUS_MAPPING[maidId] = [bonus1, bonus2, bonus3]
-}
-
-// 供系统读取配置并生成对应女仆的具体加成数据
+/**
+ * 根据女仆 ID 的哈希值确定性地生成符合局外养成系统的技能组合。
+ */
 export function generateMaidBonuses(maidId: string): MaidBonus[] {
-  const bonusIds = MAID_BONUS_MAPPING[maidId] || ['max_hp', 'atk_base', 'def_base']
+  const hash = Array.from(maidId).reduce((acc, char) => acc + char.charCodeAt(0), 0)
   
-  return bonusIds.map((bonusId, i) => {
-    const bp = BONUS_DICTIONARY[bonusId]
-    if (!bp) {
-      throw new Error(`未知加成ID: ${bonusId}`)
-    }
+  const keys = Object.keys(BONUS_DICTIONARY)
+  // 为每个女仆随机（但确定）挑选 2 个专长
+  const index1 = hash % keys.length
+  const index2 = (hash * 3 + 7) % keys.length
+  
+  const selectedKeys = [keys[index1]]
+  if (index1 !== index2) {
+    selectedKeys.push(keys[index2])
+  } else {
+    selectedKeys.push(keys[(index1 + 1) % keys.length])
+  }
 
-    let chapters: number[] = []
-    if (i === 0) chapters = [1, 4, 7, 10]
-    else if (i === 1) chapters = [2, 5, 8]
-    else chapters = [3, 6, 9]
-
-    const milestones = chapters.map(ch => {
-      let val = bp.scale
-      if (bp.discrete) {
-        val = 1
-      } else {
-        val = bp.scale * (1 + (ch * 0.2))
-        val = Math.round(val * 10) / 10
-      }
-      return {
-        chapterId: `story_${ch}`,
-        value: val
-      }
-    })
+  return selectedKeys.map((key, i) => {
+    const template = BONUS_DICTIONARY[key]
+    
+    // 生成 milestones
+    const milestones = [
+      { chapterId: 'story_1', value: i === 0 ? 5 : 2 },
+      { chapterId: 'story_4', value: i === 0 ? 10 : 5 },
+      { chapterId: 'story_7', value: i === 0 ? 15 : 8 },
+      { chapterId: 'story_10', value: i === 0 ? 25 : 12 }
+    ]
 
     return {
-      name: bp.name,
-      description: bp.description,
-      growthValue: bp.isGrowth && !bp.discrete ? Number((bp.scale * 0.1).toFixed(2)) : 0,
-      unit: bp.unit,
+      ...template,
       milestones
     }
+  })
+}
+
+// 修改 applyDynamicBonuses 函数，给女仆赋予这套新技能
+export function applyDynamicBonuses(maids: Maid[]) {
+  maids.forEach(maid => {
+    // 覆盖默认在 CSV 里读出来或者 Mock 的 bonus
+    maid.bonuses = generateMaidBonuses(maid.id)
   })
 }

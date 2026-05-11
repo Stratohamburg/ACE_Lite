@@ -6,10 +6,8 @@ import type { DetailTab } from '../types'
 
 const collectionStore = useCollectionStore()
 const tabs: Array<{ value: DetailTab; label: string }> = [
-  { value: 'attributes', label: '属性' },
-  { value: 'upgrade', label: '训练' },
-  { value: 'affection', label: '亲密' },
-  { value: 'story', label: '阶段' },
+  { value: 'attributes', label: '档案' },
+  { value: 'story', label: '养成记录' },
 ]
 
 const maid = computed(() => collectionStore.selectedMaid)
@@ -23,6 +21,11 @@ const bonusPreview = computed(() => {
 })
 const affectionTarget = computed(() => getStageTarget(maid.value.affection))
 const affectionPercent = computed(() => Math.min((maid.value.affection / affectionTarget.value) * 100, 100))
+
+const currentChapterId = computed(() => {
+  const unlocked = maid.value.storyChapters.filter(c => isStoryUnlocked(maid.value, c))
+  return unlocked.length > 0 ? unlocked[unlocked.length - 1].id : null
+})
 
 const expandedChapterId = ref<string | null>(null)
 
@@ -147,7 +150,9 @@ function sendPremiumGift() {
                     {{ bonus.name }}
                     <span v-if="!bonus.isUnlocked" class="lock-icon" title="未解锁">🔒</span>
                   </dt>
-                  <dd v-if="bonus.isUnlocked">{{ bonus.description }} +{{ formatBonusValue(bonus.value, bonus.unit) }}</dd>
+                  <dd v-if="bonus.isUnlocked">
+                    {{ bonus.description }} <span v-if="bonus.unit !== 'none'">+{{ formatBonusValue(bonus.value, bonus.unit) }}</span>
+                  </dd>
                 </div>
                 <div v-if="bonus.unlockHint" style="font-size: 11px; color: #ffb6c1; text-align: right; opacity: 0.8;">
                   {{ bonus.unlockHint }}
@@ -167,74 +172,104 @@ function sendPremiumGift() {
           </article>
         </section>
 
-        <section v-else-if="collectionStore.activeDetailTab === 'upgrade'" class="detail-content">
-          <article class="panel-card">
-            <h4>当前训练等级：{{ maid.level }}</h4>
-          </article>
+        <!-- 原升级、亲密页签已被整合至 timeline-mode 中 -->
 
-          <article class="panel-card mt-2">
-            <h4>提升训练等级，将会解锁：</h4>
-            <ul class="skill-list" style="margin-top: 8px;">
-               <li v-for="chapter in maid.storyChapters.filter(c => c.unlockLevel === maid.level + 1)" :key="chapter.id">
-                 <strong>开启新阶段：{{ chapter.title }}</strong>
-               </li>
-               <li v-if="maid.storyChapters.filter(c => c.unlockLevel === maid.level + 1).length === 0">
-                 <em>提升等级可强化当前已解锁的能力</em>
-               </li>
-            </ul>
-            <div style="margin-top: 16px;">
-              <button class="primary-button wide" type="button" @click="collectionStore.upgradeSelected()">消耗「特训指南」进行训练</button>
-            </div>
-          </article>
-        </section>
+        <section v-else class="detail-content timeline-mode">
+          <!-- 垂直时间线容器 -->
+          <div class="timeline-container">
+            <template v-for="chapter in maid.storyChapters" :key="chapter.id">
+              
+              <!-- 过去阶段：带有一点点弱化背景的单行节点 -->
+              <div v-if="isStoryUnlocked(maid, chapter) && chapter.id !== currentChapterId" class="timeline-node past-node">
+                <div class="timeline-track">
+                  <div class="timeline-dot" :style="{ background: '#888', borderColor: '#888' }"></div>
+                  <div class="timeline-line"></div>
+                </div>
+                <!-- 纯净的“名称 + 加成文字”组成的单行列表 -->
+                <div class="past-row" style="flex-grow: 1; padding: 12px 14px; margin-bottom: 16px; background: rgba(255,255,255,0.06); border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                  <strong style="color: rgba(255,255,255,0.7); font-size: 14px;">{{ chapter.title }}</strong>
+                  <div class="chapter-bonuses" style="opacity: 0.8;" v-if="getChapterBonuses(chapter.id).length > 0">
+                    <span v-for="b in getChapterBonuses(chapter.id)" :key="b.name" class="bonus-tag" style="background: transparent; border: 1px solid rgba(255,182,193,0.3); margin: 0 0 0 6px;">
+                      {{ b.description }} <span v-if="b.unit !== 'none'">+{{ formatBonusValue(b.value, b.unit) }}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-        <section v-else-if="collectionStore.activeDetailTab === 'affection'" class="detail-content">
-          <article class="panel-card">
-            <h4>亲密状态</h4>
-            <p>{{ getLoveStage(maid.affection) }} · 当前亲密度 {{ maid.affection }} / {{ affectionTarget }}</p>
-            <div class="affection-track">
-              <div class="affection-fill" :style="{ width: `${affectionPercent}%`, background: maid.accent }"></div>
-            </div>
-            <div class="gift-actions" style="display: flex; flex-direction: column; gap: 8px;">
-              <button class="secondary-button wide" type="button" @click="greet" :disabled="hasGreetedToday" :style="{ opacity: hasGreetedToday ? 0.5 : 1, cursor: hasGreetedToday ? 'not-allowed' : 'pointer' }">
-                {{ hasGreetedToday ? '今天已问好' : '问好 +1' }}
-              </button>
-              <button class="secondary-button wide" type="button" @click="sendNormalGift">送普通礼物：{{ currentNormalGift }} +10</button>
-              <button class="primary-button wide" type="button" @click="sendPremiumGift">送高级礼物：{{ currentPremiumGift }} +20</button>
-            </div>
-          </article>
-        </section>
+              <!-- 当前阶段：高亮展开并内嵌互动功能 -->
+              <div v-else-if="chapter.id === currentChapterId" class="timeline-node current-node">
+                <div class="timeline-track">
+                  <div class="timeline-dot" :style="{ background: maid.accent, boxShadow: `0 0 10px ${maid.accent}` }"></div>
+                  <div class="timeline-line"></div>
+                </div>
+                <article class="panel-card timeline-card" style="border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1); margin-bottom: 16px;">
+                  <div class="chapter-header" style="margin-bottom: 12px;">
+                     <!-- 直接显示阶段名称本身 -->
+                     <h3 style="margin: 0 0 8px 0; font-size: 20px; color: #fff;">{{ chapter.title }}</h3>
+                     <!-- 跟随加成效果说明 -->
+                     <div class="chapter-bonuses" v-if="getChapterBonuses(chapter.id).length > 0">
+                       <span v-for="b in getChapterBonuses(chapter.id)" :key="b.name" class="bonus-tag" style="font-size: 12px; padding: 4px 8px; margin-top: 0; margin-bottom: 8px;">
+                         {{ b.description }} <span v-if="b.unit !== 'none'">+{{ formatBonusValue(b.value, b.unit) }}</span>
+                       </span>
+                     </div>
+                  </div>
+                  <!-- 正文容器 -->
+                  <div class="chapter-body" style="border-top: none; padding-top: 0; margin-top: 0;">
+                    <p style="font-size: 14px; opacity: 0.95; margin-bottom: 0;">{{ chapter.content }}</p>
+                  </div>
 
-        <section v-else class="detail-content">
-          <article class="panel-card">
-            <h4>履历阶段记录</h4>
-            <ul class="story-list">
-              <li v-for="chapter in maid.storyChapters" :key="chapter.id" :class="{ unlocked: isStoryUnlocked(maid, chapter) }">
-                <div class="chapter-header" :class="{ 'cursor-pointer': isStoryUnlocked(maid, chapter) }" @click="isStoryUnlocked(maid, chapter) && toggleChapter(chapter.id)">
-                  <div class="chapter-header-main" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <strong style="margin-bottom: 0px;">{{ chapter.title }}</strong>
-                    <div v-if="getChapterBonuses(chapter.id).length > 0" :style="{ opacity: isStoryUnlocked(maid, chapter) ? 1 : 0.5, filter: isStoryUnlocked(maid, chapter) ? 'none' : 'grayscale(1)' }">
-                      <span v-for="b in getChapterBonuses(chapter.id)" :key="b.name" style="font-size: 12px; color: #ffb6c1;">
-                        {{ b.description }} (+{{ formatBonusValue(b.value, b.unit) }})
-                      </span>
+                  <!-- 无缝衔接的互动区 -->
+                  <div class="current-interactions" style="margin-top: 20px; padding-top: 16px; border-top: 1px dashed rgba(255,255,255,0.2);">
+                    
+                    <!-- 升级操作区 -->
+                    <div style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+                       <div>
+                         <div style="font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 4px;">当前训练等级</div>
+                         <strong style="font-size: 18px;">Lv.{{ maid.level }}</strong>
+                       </div>
+                       <button class="primary-button" style="padding: 8px 20px; font-size: 14px;" type="button" @click="collectionStore.upgradeSelected()">
+                         + 上升阶段
+                       </button>
                     </div>
+
+                    <!-- 好感度进度区 -->
+                    <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+                      <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+                        <span>羁绊状态: <strong>{{ getLoveStage(maid.affection) }}</strong></span>
+                        <span style="font-family: monospace;">{{ maid.affection }} / {{ affectionTarget }}</span>
+                      </div>
+                      <div class="affection-track" style="margin-bottom: 16px;">
+                        <div class="affection-fill" :style="{ width: `${affectionPercent}%`, background: maid.accent }"></div>
+                      </div>
+                      <div class="gift-actions" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <button class="secondary-button" style="font-size: 12px;" type="button" @click="greet" :disabled="hasGreetedToday" :style="{ opacity: hasGreetedToday ? 0.5 : 1 }">
+                          {{ hasGreetedToday ? '今日已问候' : '问好 (+1)' }}
+                        </button>
+                        <button class="secondary-button" style="font-size: 12px;" type="button" @click="sendNormalGift">送普通礼物 (+10)</button>
+                        <button class="primary-button" style="grid-column: span 2; font-size: 13px;" type="button" @click="sendPremiumGift">赠送高级礼物 (+20)</button>
+                      </div>
+                    </div>
+
                   </div>
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <small>
-                      {{ isStoryUnlocked(maid, chapter) ? '已解锁' : `需 Lv.${chapter.unlockLevel} 且 好感度 ${chapter.unlockAffection}` }}
-                    </small>
-                    <small>
-                      <span v-if="isStoryUnlocked(maid, chapter)" class="expand-icon">{{ expandedChapterId === chapter.id ? '▼' : '▶' }}</span>
-                      <span v-else class="expand-icon lock-icon">🔒</span>
-                    </small>
+                </article>
+              </div>
+
+              <!-- 后续阶段：锁定状态掩码卡片 -->
+              <div v-else class="timeline-node future-node">
+                <div class="timeline-track">
+                  <div class="timeline-dot" style="background: transparent; border: 2px solid #555;"></div>
+                  <div class="timeline-line"></div>
+                </div>
+                <article class="panel-card timeline-card" style="opacity: 0.6; filter: grayscale(1); background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; min-height: 80px; margin-bottom: 16px;">
+                  <div style="text-align: center;">
+                    <span class="lock-icon" style="font-size: 24px; display: block; margin-bottom: 6px; opacity: 1;">🔒</span>
+                    <small style="color: rgba(255,255,255,0.6);">需 <strong>Lv.{{ chapter.unlockLevel }}</strong> 且 好感度 <strong>{{ chapter.unlockAffection }}</strong></small>
                   </div>
-                </div>
-                <div class="chapter-body" v-show="expandedChapterId === chapter.id">
-                  <p>{{ chapter.content }}</p>
-                </div>
-              </li>
-            </ul>
-          </article>
+                </article>
+              </div>
+
+            </template>
+          </div>
         </section>
       </div>
     </aside>
