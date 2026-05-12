@@ -740,34 +740,11 @@ button {
 
 .detail-affection-bar {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   padding: 12px;
   border: 1px solid rgba(255, 240, 220, 0.12);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.06);
-}
-
-.detail-affection-copy {
-  display: grid;
-  gap: 4px;
-}
-
-.detail-affection-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
-}
-
-.detail-affection-total {
-  font-family: monospace;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.detail-affection-progress-hint {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.58);
 }
 
 .detail-affection-actions {

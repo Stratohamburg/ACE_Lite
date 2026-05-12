@@ -282,15 +282,6 @@ function sendPremiumGift() {
 
         <div class="detail-action-stack">
           <section class="detail-affection-bar">
-            <div class="detail-affection-copy">
-              <span class="detail-train-kicker">好感提升</span>
-              <div class="detail-affection-title-row">
-                <span>羁绊状态: <strong>{{ getLoveStage(maid.affection) }}</strong></span>
-                <span class="detail-affection-total">{{ currentStageProgressLabel }}</span>
-              </div>
-              <span class="detail-affection-progress-hint">{{ currentStageProgressHint }}</span>
-            </div>
-
             <div class="detail-affection-actions">
               <button class="secondary-button detail-affection-button" type="button" @click="greet" :disabled="hasGreetedToday" :style="{ opacity: hasGreetedToday ? 0.5 : 1 }">
                 <span class="detail-affection-button-main">{{ hasGreetedToday ? '今日已问好' : '问好' }}</span>
