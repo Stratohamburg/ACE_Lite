@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
-import { GameConfigs } from '../data/configLoader'
+import { computed, ref } from 'vue'
+import { GameConfigs, type ShopItemConfig } from '../data/configLoader'
+import { useEconomyStore } from '../stores/economy'
 
 const activeSubTab = ref('gacha')
+const economyStore = useEconomyStore()
 
 const generatedCount = ref(0)
 const showResult = ref(false)
@@ -102,6 +104,36 @@ const exitRef = ref<HTMLElement | null>(null)
 // 动态计算的掉落队列
 const activeDrops = ref<{id: number, style: any, color: string}[]>([])
 const droppedIndices = ref<number[]>([])
+const shopNotice = ref<{ tone: 'success' | 'danger' | 'info'; message: string } | null>(null)
+const visibleShopItems = computed(() => GameConfigs.shopItems.filter((item) => item.tab_name === (activeSubTab.value === 'daily' ? '每日精选' : activeSubTab.value === 'items' ? '道具商城' : '礼包中心')))
+const gachaSupplyText = computed(() => `代币 ${economyStore.gachaTokenCount} / 强化石 ${economyStore.enhancementStoneCount}`)
+const singleGachaState = computed(() => economyStore.getGachaActionState(1))
+const tenGachaState = computed(() => economyStore.getGachaActionState(10))
+
+function setShopNotice(message: string, tone: 'success' | 'danger' | 'info') {
+  shopNotice.value = { message, tone }
+}
+
+function handleGacha(times: number) {
+  const result = economyStore.spendForGacha(times)
+  if (!result.ok) {
+    setShopNotice(result.message, 'danger')
+    return
+  }
+
+  setShopNotice(result.message, 'info')
+
+  void doGacha(times)
+}
+
+function buyItem(item: ShopItemConfig) {
+  const result = economyStore.purchaseShopItem(item)
+  setShopNotice(result.message, result.ok ? 'success' : 'danger')
+}
+
+function getBuyState(item: ShopItemConfig) {
+  return economyStore.getShopItemState(item)
+}
 
 const doGacha = async (times: number) => {
   if (isAnimating.value) return
@@ -204,8 +236,8 @@ const closeResult = () => {
     <header class="top-bar">
       <h2>商店</h2>
       <div class="resources">
-        <span class="res gold">💰 12.5k</span>
-        <span class="res diamond">💎 1500</span>
+        <span class="res gold">💰 {{ economyStore.goldLabel }}</span>
+        <span class="res diamond">💎 {{ economyStore.diamondLabel }}</span>
       </div>
     </header>
 
@@ -217,6 +249,8 @@ const closeResult = () => {
     </div>
 
     <div class="content">
+      <div v-if="shopNotice" class="shop-notice" :class="`is-${shopNotice.tone}`">{{ shopNotice.message }}</div>
+
       <template v-if="activeSubTab === 'gacha'">
         <div class="gacha-machine" ref="machineRef">
           <!-- 正在掉落的抽卡胶囊集合 -->
@@ -242,26 +276,36 @@ const closeResult = () => {
             <div class="exit-hole" ref="exitRef"></div>
           </div>
           <div class="gacha-pity">保底: 18抽必出稀有(黄)，36抽必出极品(红)</div>
+          <div class="gacha-stock">库存: {{ gachaSupplyText }}</div>
           <div class="gacha-actions">
-            <button class="gacha-btn single" :class="{disabled: isAnimating}" @click="doGacha(1)">
+            <button class="gacha-btn single" :class="{disabled: isAnimating || singleGachaState.disabled}" :disabled="isAnimating || singleGachaState.disabled" @click="handleGacha(1)">
               <div class="title">投币 1次</div>
-              <div class="cost">💎 150</div>
+              <div class="cost">优先消耗代币，其次 💎 150</div>
             </button>
-            <button class="gacha-btn ten" :class="{disabled: isAnimating}" @click="doGacha(10)">
+            <button class="gacha-btn ten" :class="{disabled: isAnimating || tenGachaState.disabled}" :disabled="isAnimating || tenGachaState.disabled" @click="handleGacha(10)">
               <div class="title">投币 10次</div>
-              <div class="cost">💎 1500</div>
+              <div class="cost">优先消耗代币，其次 💎 1500</div>
             </button>
+          </div>
+          <div class="gacha-hints">
+            <p class="gacha-hint" :class="`is-${singleGachaState.tone}`">单抽: {{ singleGachaState.hint }}</p>
+            <p class="gacha-hint" :class="`is-${tenGachaState.tone}`">十连: {{ tenGachaState.hint }}</p>
           </div>
         </div>
       </template>
 
       <template v-else>
         <div class="item-grid">
-          <div class="item-card" v-for="item in GameConfigs.shopItems.filter(i => i.tab_name === (activeSubTab === 'daily' ? '每日精选' : activeSubTab === 'items' ? '道具商城' : '礼包中心'))" :key="item.id">
+          <div class="item-card" v-for="item in visibleShopItems" :key="item.id">
             <div class="item-icon">📦</div>
             <div class="item-name">{{ item.item_name }}</div>
+            <div class="item-desc">{{ item.description }}</div>
             <div class="item-limit" v-if="item.buy_limit < 99">限购: {{ item.buy_limit }}次</div>
-            <button class="buy-btn">{{ item.price_type }}: {{ item.price_value }}</button>
+            <button class="buy-btn" :class="`is-${getBuyState(item).tone}`" :disabled="getBuyState(item).disabled" @click="buyItem(item)">{{ getBuyState(item).label }}</button>
+            <div class="item-status" :class="`is-${getBuyState(item).tone}`">{{ getBuyState(item).hint }}</div>
+            <div class="item-owned" v-if="item.id === 2002">持有代币: {{ economyStore.gachaTokenCount }}</div>
+            <div class="item-owned" v-else-if="item.id === 2003">持有强化石: {{ economyStore.enhancementStoneCount }}</div>
+            <div class="item-owned" v-else>已购: {{ economyStore.getPurchaseCount(item.id) }} / {{ item.buy_limit }}</div>
           </div>
         </div>
       </template>
@@ -332,6 +376,32 @@ const closeResult = () => {
   padding: 16px;
 }
 
+.shop-notice {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+}
+
+.shop-notice.is-success {
+  background: rgba(108, 200, 186, 0.16);
+  border-color: rgba(108, 200, 186, 0.4);
+  color: #bdf6ec;
+}
+
+.shop-notice.is-danger {
+  background: rgba(255, 107, 107, 0.14);
+  border-color: rgba(255, 107, 107, 0.35);
+  color: #ffc2c2;
+}
+
+.shop-notice.is-info {
+  background: rgba(79, 172, 254, 0.14);
+  border-color: rgba(79, 172, 254, 0.35);
+  color: #cde7ff;
+}
+
 .gacha-machine {
   background: #1e1e2f;
   border-radius: 12px;
@@ -387,22 +457,35 @@ const closeResult = () => {
 .machine-exit { width: 100px; height: 30px; border-bottom: 4px solid #333; margin: 10px 0; position: relative; }
 .exit-hole { width: 60px; height: 20px; background: #000; margin: 0 auto; border-radius: 4px; }
 
-.gacha-pity { font-size: 12px; color: #aaa; margin-bottom: 16px; }
+.gacha-pity { font-size: 12px; color: #aaa; margin-bottom: 12px; }
+.gacha-stock { font-size: 12px; color: #8ec5ff; margin-bottom: 16px; }
 
 .gacha-actions { display: flex; gap: 16px; width: 100%; }
 .gacha-btn { flex: 1; padding: 12px 0; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; transition: all 0.2s; }
 .gacha-btn.single { background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%); color: #fff; }
 .gacha-btn.ten { background: linear-gradient(to right, #fa709a 0%, #fee140 100%); color: #000; }
 .gacha-btn:active:not(.disabled) { opacity: 0.8; transform: scale(0.95); }
+.gacha-btn:disabled { filter: grayscale(80%); cursor: not-allowed; opacity: 0.7; }
 .gacha-btn.disabled { filter: grayscale(80%); cursor: not-allowed; opacity: 0.7; }
 .gacha-btn .cost { font-size: 12px; margin-top: 4px; font-weight: normal; }
+.gacha-hints { width: 100%; margin-top: 12px; display: grid; gap: 6px; }
+.gacha-hint { margin: 0; font-size: 11px; color: #cde7ff; }
+.gacha-hint.is-danger { color: #ffb6b6; }
 
 .item-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .item-card { background: #1a1a2e; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; align-items: center; }
 .item-icon { font-size: 32px; margin-bottom: 8px; }
 .item-name { font-size: 14px; font-weight: bold; margin-bottom: 4px; text-align: center; }
+.item-desc { font-size: 12px; color: #aaa; margin-bottom: 10px; text-align: center; line-height: 1.4; }
 .item-limit { font-size: 12px; color: #888; margin-bottom: 12px; }
 .buy-btn { background: #3a3a5e; color: #fff; border: none; padding: 6px 12px; border-radius: 12px; width: 100%; font-size: 12px; cursor: pointer; }
+.buy-btn.is-danger { background: rgba(255, 107, 107, 0.2); }
+.buy-btn.is-muted { background: rgba(255, 255, 255, 0.08); color: #aaa; }
+.buy-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.item-status { font-size: 11px; margin-top: 8px; color: #9ec7ff; text-align: center; }
+.item-status.is-danger { color: #ffb6b6; }
+.item-status.is-muted { color: #aaa; }
+.item-owned { font-size: 11px; color: #8ec5ff; margin-top: 8px; }
 
 /* 抽卡结果弹窗样式 */
 .gacha-overlay {

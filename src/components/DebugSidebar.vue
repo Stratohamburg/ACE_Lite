@@ -2,17 +2,18 @@
 import { computed } from 'vue'
 import { useCollectionStore } from '../stores/collection'
 import { useDebugStore } from '../stores/debug'
+import { useEconomyStore } from '../stores/economy'
 import { useViewportStore } from '../stores/viewport'
 import type { DetailTab, DrawerMode } from '../types'
 
 const collectionStore = useCollectionStore()
 const debugStore = useDebugStore()
+const economyStore = useEconomyStore()
 const viewportStore = useViewportStore()
 
 const drawerModes: DrawerMode[] = ['collapsed', 'half', 'expanded']
 const tabs: Array<{ value: DetailTab; label: string }> = [
   { value: 'attributes', label: '属性' },
-  { value: 'upgrade', label: '升级' },
   { value: 'affection', label: '爱情' },
   { value: 'story', label: '故事' },
 ]
@@ -44,6 +45,36 @@ function toggleSelectedUnlocked() {
 
   collectionStore.toggleUnlocked(collectionStore.selectedMaid.id)
   debugStore.logAction(`切换解锁状态: ${collectionStore.selectedMaid.name}`)
+}
+
+function grantGold() {
+  economyStore.grantGold(10000)
+  debugStore.logAction('调试发放资源: 金币 +10000')
+}
+
+function grantDiamonds() {
+  economyStore.grantDiamonds(1000)
+  debugStore.logAction('调试发放资源: 钻石 +1000')
+}
+
+function grantGachaTokens() {
+  economyStore.grantItem('gachaToken', 10)
+  debugStore.logAction('调试发放物资: 抽卡代币 +10')
+}
+
+function grantEnhancementStones() {
+  economyStore.grantItem('enhancementStone', 20)
+  debugStore.logAction('调试发放物资: 强化石 +20')
+}
+
+function grantNormalGifts() {
+  economyStore.grantItem('normalGift', 5)
+  debugStore.logAction('调试发放物资: 普通礼盒 +5')
+}
+
+function grantPremiumGifts() {
+  economyStore.grantItem('premiumGift', 3)
+  debugStore.logAction('调试发放物资: 高级礼盒 +3')
 }
 </script>
 
@@ -117,8 +148,7 @@ function toggleSelectedUnlocked() {
 
     <section class="debug-section">
       <h2>快捷操作</h2>
-      <div class="debug-row two-columns">
-        <button class="secondary-button" type="button" @click="collectionStore.upgradeSelected()">升级 +1</button>
+      <div class="debug-row">
         <button class="secondary-button" type="button" @click="collectionStore.giftSelected()">送礼 +20</button>
       </div>
       <div class="debug-row two-columns">
@@ -132,6 +162,48 @@ function toggleSelectedUnlocked() {
         </button>
         <button class="secondary-button" type="button" @click="collectionStore.closeDetail()">关闭详情</button>
       </div>
+    </section>
+
+    <section class="debug-section">
+      <h2>资源调试</h2>
+      <div class="debug-row two-columns">
+        <button class="secondary-button" type="button" @click="grantGold">金币 +10000</button>
+        <button class="secondary-button" type="button" @click="grantDiamonds">钻石 +1000</button>
+      </div>
+      <div class="debug-row two-columns">
+        <button class="secondary-button" type="button" @click="grantGachaTokens">代币 +10</button>
+        <button class="secondary-button" type="button" @click="grantEnhancementStones">强化石 +20</button>
+      </div>
+      <div class="debug-row two-columns">
+        <button class="secondary-button" type="button" @click="grantNormalGifts">普礼 +5</button>
+        <button class="secondary-button" type="button" @click="grantPremiumGifts">高礼 +3</button>
+      </div>
+      <dl class="debug-metrics">
+        <div>
+          <dt>Gold</dt>
+          <dd>{{ economyStore.goldLabel }}</dd>
+        </div>
+        <div>
+          <dt>Diamond</dt>
+          <dd>{{ economyStore.diamondLabel }}</dd>
+        </div>
+        <div>
+          <dt>Token</dt>
+          <dd>{{ economyStore.gachaTokenCount }}</dd>
+        </div>
+        <div>
+          <dt>Stone</dt>
+          <dd>{{ economyStore.enhancementStoneCount }}</dd>
+        </div>
+        <div>
+          <dt>Gift</dt>
+          <dd>{{ economyStore.normalGiftCount }}</dd>
+        </div>
+        <div>
+          <dt>Premium</dt>
+          <dd>{{ economyStore.premiumGiftCount }}</dd>
+        </div>
+      </dl>
     </section>
 
     <section class="debug-section">

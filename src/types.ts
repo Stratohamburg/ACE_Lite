@@ -1,6 +1,6 @@
 export type Rarity = 'R' | 'SR' | 'SSR'
 export type DrawerMode = 'collapsed' | 'half' | 'expanded'
-export type DetailTab = 'attributes' | 'upgrade' | 'affection' | 'story'
+export type DetailTab = 'attributes' | 'affection' | 'story'
 export type LoveStage = '陌生' | '熟悉' | '亲密' | '恋慕' | '誓约'
 
 export interface MaidBonus {

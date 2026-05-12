@@ -4,6 +4,7 @@ import { mockMaids } from '../data/mock'
 import { generateMaidBonuses } from '../data/bonusConfig'
 import type { DetailTab, DrawerMode, Maid } from '../types'
 import { getLoveStage } from '../utils/maids'
+import { useEconomyStore } from './economy'
 
 function cloneMaids() {
   return mockMaids.map((maid) => ({
@@ -16,6 +17,7 @@ function cloneMaids() {
 }
 
 export const useCollectionStore = defineStore('collection', () => {
+  const economyStore = useEconomyStore()
   const maids = ref<Maid[]>(cloneMaids())
   const drawerMode = ref<DrawerMode>('collapsed')
   const detailVisible = ref(false)
@@ -57,24 +59,46 @@ export const useCollectionStore = defineStore('collection', () => {
     activeDetailTab.value = tab
   }
 
-  function upgradeSelected() {
-    const maid = selectedMaid.value
-
-    if (!maid || !maid.unlocked) {
-      return
-    }
-
-    maid.level += 1
-  }
-
   function giftSelected(amount = 20) {
     const maid = selectedMaid.value
 
     if (!maid || !maid.unlocked) {
-      return
+      return false
+    }
+
+    if (amount > 1) {
+      const result = economyStore.spendForGift(amount >= 20 ? 'premium' : 'normal')
+      if (!result.ok) {
+        alert(result.message)
+        return false
+      }
     }
 
     maid.affection += amount
+    return true
+  }
+
+  function unlockMaid(maidId: string) {
+    const maid = maids.value.find((item) => item.id === maidId)
+
+    if (!maid) {
+      return { ok: false, message: '目标女仆不存在' }
+    }
+
+    if (maid.unlocked) {
+      return { ok: false, message: `${maid.name} 已解锁` }
+    }
+
+    const result = economyStore.spendForMaidUnlock(maid)
+    if (!result.ok) {
+      return result
+    }
+
+    maid.unlocked = true
+    maid.unlockHint = '已解锁'
+    selectedMaidId.value = maid.id
+
+    return result
   }
 
   function setShowcase(maidId: string) {
@@ -105,6 +129,7 @@ export const useCollectionStore = defineStore('collection', () => {
     }
 
     maid.unlocked = !maid.unlocked
+    maid.unlockHint = maid.unlocked ? '已解锁' : '通关主线章节解锁'
     if (!maid.unlocked) {
       maid.isInTeam = false
       maid.isShowcase = false
@@ -130,8 +155,8 @@ export const useCollectionStore = defineStore('collection', () => {
     openDetail,
     closeDetail,
     setActiveDetailTab,
-    upgradeSelected,
     giftSelected,
+    unlockMaid,
     setShowcase,
     setTeamSlot,
     toggleUnlocked,

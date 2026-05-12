@@ -1,10 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useEconomyStore } from '../stores/economy'
 
-const activeSubTab = ref('attrs') // attrs, skills, talents
+const activeSubTab = ref('attrs')
+const economyStore = useEconomyStore()
 
-const level = ref(45)
-const power = ref(125000)
+const attack = computed(() => 1500 + (economyStore.protagonistLevel - 45) * 150)
+const hp = computed(() => 8000 + (economyStore.protagonistLevel - 45) * 800)
+const defense = computed(() => 400 + (economyStore.protagonistLevel - 45) * 50)
+
+function upgradeProtagonist() {
+  const result = economyStore.upgradeProtagonist()
+  if (!result.ok) {
+    alert(result.message)
+  }
+}
 </script>
 
 <template>
@@ -12,15 +22,15 @@ const power = ref(125000)
     <header class="top-bar">
       <h2>升级</h2>
       <div class="resources">
-        <span class="res">💰 50.2k</span>
-        <span class="res">💎 1500</span>
+        <span class="res">💰 {{ economyStore.goldLabel }}</span>
+        <span class="res">💎 {{ economyStore.diamondLabel }}</span>
       </div>
     </header>
 
     <div class="level-info">
       <div class="level-text">
-        <span>主角等级: Lv {{ level }}</span>
-        <span>战力: {{ power.toLocaleString() }}</span>
+        <span>主角等级: Lv {{ economyStore.protagonistLevel }}</span>
+        <span>战力: {{ economyStore.protagonistPower.toLocaleString() }}</span>
       </div>
       <div class="progress-bar">
         <div class="progress-fill" style="width: 65%;"></div>
@@ -41,13 +51,13 @@ const power = ref(125000)
       
       <div class="panel-content">
         <template v-if="activeSubTab === 'attrs'">
-          <div class="attr-row"><span>攻击力</span> <span>1500 ➔ <span class="next-val">1650</span></span></div>
-          <div class="attr-row"><span>生命值</span> <span>8000 ➔ <span class="next-val">8800</span></span></div>
-          <div class="attr-row"><span>防御力</span> <span>400 ➔ <span class="next-val">450</span></span></div>
+          <div class="attr-row"><span>攻击力</span> <span>{{ attack }} ➔ <span class="next-val">{{ attack + 150 }}</span></span></div>
+          <div class="attr-row"><span>生命值</span> <span>{{ hp }} ➔ <span class="next-val">{{ hp + 800 }}</span></span></div>
+          <div class="attr-row"><span>防御力</span> <span>{{ defense }} ➔ <span class="next-val">{{ defense + 50 }}</span></span></div>
           
           <div class="action-row">
-            <span class="cost">消耗: 💰 2000</span>
-            <button class="upgrade-btn">升级</button>
+            <span class="cost">消耗: 💰 {{ economyStore.protagonistUpgradeCost }}</span>
+            <button class="upgrade-btn" :disabled="!economyStore.canUpgradeProtagonist()" @click="upgradeProtagonist">升级</button>
           </div>
         </template>
         <template v-else-if="activeSubTab === 'skills'">
@@ -90,5 +100,6 @@ const power = ref(125000)
 .action-row { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
 .cost { font-size: 12px; color: #aaa; }
 .upgrade-btn { background: #ffb6c1; color: #000; border: none; padding: 8px 24px; border-radius: 16px; font-weight: bold; cursor: pointer; }
+.upgrade-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .placeholder-text { text-align: center; color: #888; margin-top: 20px; }
 </style>

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useCollectionStore } from '../stores/collection'
+import { useEconomyStore } from '../stores/economy'
 import { getLoveStage, getDerivedBonuses, formatBonusValue } from '../utils/maids'
 import MaidDrawer from './MaidDrawer.vue'
 import MaidDetailPanel from './MaidDetailPanel.vue'
 
 const collectionStore = useCollectionStore()
+const economyStore = useEconomyStore()
 
 const featuredMaid = computed(() => collectionStore.showcaseMaid ?? collectionStore.teamMaids[0] ?? collectionStore.maids[0])
 const sideTeamMaids = computed(() => collectionStore.teamMaids.filter((maid) => maid.id !== featuredMaid.value?.id).slice(0, 2))
@@ -42,8 +44,8 @@ function openFeatured() {
     <header class="top-bar">
       <h2>女仆藏品馆</h2>
       <div class="resources">
-        <span class="res gold">💰 12.5k</span>
-        <span class="res diamond">💎 1500</span>
+        <span class="res gold">💰 {{ economyStore.goldLabel }}</span>
+        <span class="res diamond">💎 {{ economyStore.diamondLabel }}</span>
       </div>
     </header>
 
