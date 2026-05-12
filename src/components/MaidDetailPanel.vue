@@ -200,15 +200,16 @@ function sendPremiumGift() {
                   <div class="timeline-dot" :style="{ background: maid.accent, borderColor: maid.accent, opacity: 1 }"></div>
                   <div class="timeline-line" :style="{ width: '6px', borderLeftWidth: '0', background: maid.accent, borderRadius: '999px', opacity: 1 }"></div>
                 </div>
-                <!-- 纯净的“名称 + 加成文字”组成的单行列表 -->
                 <div style="flex-grow: 1; margin-bottom: 10px;">
-                  <div class="past-row" @click="toggleChapter(chapter.id)" style="cursor: pointer; padding: 10px 12px; background: rgba(255,255,255,0.06); border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="font-size: 10px; color: rgba(255,255,255,0.5);">{{ expandedChapterId === chapter.id ? '▼' : '▶' }}</span>
-                      <strong style="color: rgba(255,255,255,0.7); font-size: 13px;">{{ chapter.title }}</strong>
+                  <div class="past-row" style="padding: 10px 12px; background: rgba(255,255,255,0.06); border-radius: 8px; display: grid; gap: 6px;">
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
+                      <strong style="color: rgba(255,255,255,0.7); font-size: 13px; line-height: 1.35;">{{ chapter.title }}</strong>
+                      <button type="button" @click="toggleChapter(chapter.id)" style="flex-shrink: 0; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; color: rgba(255,255,255,0.72); font-size: 10px; padding: 4px 8px; cursor: pointer;">
+                        {{ expandedChapterId === chapter.id ? '收起 ▼' : '展开 ▶' }}
+                      </button>
                     </div>
-                    <div class="chapter-bonuses" style="opacity: 0.8;" v-if="getChapterBonuses(chapter.id).length > 0">
-                      <span v-for="b in getChapterBonuses(chapter.id)" :key="b.name" class="bonus-tag" style="background: transparent; border: 1px solid rgba(255,182,193,0.3); margin: 0 0 0 4px; padding: 1px 5px; font-size: 10px;">
+                    <div class="chapter-bonuses" style="opacity: 0.8; display: flex; flex-wrap: wrap; gap: 4px;" v-if="getChapterBonuses(chapter.id).length > 0">
+                      <span v-for="b in getChapterBonuses(chapter.id)" :key="b.name" class="bonus-tag" style="background: transparent; border: 1px solid rgba(255,182,193,0.3); margin: 0; padding: 1px 5px; font-size: 10px;">
                         {{ b.description }} <span v-if="b.unit !== 'none'">+{{ formatBonusValue(b.value, b.unit) }}</span>
                       </span>
                     </div>
@@ -233,20 +234,18 @@ function sendPremiumGift() {
                   <div v-if="nextChapter" class="timeline-progress-label" :style="{ top: `${currentStageProgressLabelOffset}%` }">{{ currentStageProgressLabel }}</div>
                 </div>
                 <article class="panel-card timeline-card" style="border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.1); margin-bottom: 12px; padding: 10px;">
-                  <div class="chapter-header" style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-start;">
-                     <div>
-                       <!-- 直接显示阶段名称本身 -->
-                       <h3 style="margin: 0 0 6px 0; font-size: 18px; color: #fff;">{{ chapter.title }}</h3>
-                       <!-- 跟随加成效果说明 -->
-                       <div class="chapter-bonuses" v-if="getChapterBonuses(chapter.id).length > 0">
-                         <span v-for="b in getChapterBonuses(chapter.id)" :key="b.name" class="bonus-tag" style="font-size: 11px; padding: 2px 6px; margin-top: 0; margin-bottom: 6px;">
-                           {{ b.description }} <span v-if="b.unit !== 'none'">+{{ formatBonusValue(b.value, b.unit) }}</span>
-                         </span>
-                       </div>
-                     </div>
-                     <button type="button" @click="toggleChapter(chapter.id)" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: rgba(255,255,255,0.8); font-size: 11px; padding: 4px 10px; cursor: pointer;">
+                  <div class="chapter-header" style="margin-bottom: 8px; display: grid; gap: 6px;">
+                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                       <h3 style="margin: 0; font-size: 18px; color: #fff; line-height: 1.35;">{{ chapter.title }}</h3>
+                       <button type="button" @click="toggleChapter(chapter.id)" style="flex-shrink: 0; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: rgba(255,255,255,0.8); font-size: 11px; padding: 4px 10px; cursor: pointer;">
                         {{ expandedChapterId === chapter.id ? '收起故事 ▼' : '阅读故事 ▶' }}
-                     </button>
+                       </button>
+                     </div>
+                     <div class="chapter-bonuses" style="display: flex; flex-wrap: wrap; gap: 6px;" v-if="getChapterBonuses(chapter.id).length > 0">
+                       <span v-for="b in getChapterBonuses(chapter.id)" :key="b.name" class="bonus-tag" style="font-size: 11px; padding: 2px 6px; margin: 0;">
+                         {{ b.description }} <span v-if="b.unit !== 'none'">+{{ formatBonusValue(b.value, b.unit) }}</span>
+                       </span>
+                     </div>
                   </div>
                   <!-- 正文容器 -->
                   <transition name="story-expand">
@@ -290,24 +289,19 @@ function sendPremiumGift() {
               <button class="secondary-button detail-affection-button" type="button" :disabled="!canSendNormalGift" @click="sendNormalGift">
                 <span class="detail-affection-button-main">
                   <span aria-hidden="true">{{ getItemIcon(normalGiftCost.itemId) }}</span>
-                  <span>{{ currentNormalGift }}</span>
+                  <span>{{ `${currentNormalGift} x${normalGiftCost.amount}` }}</span>
                 </span>
-                <span class="detail-affection-button-sub">所需 {{ normalGiftCost.amount }} · 好感 +{{ normalGiftAffectionBonus }}</span>
+                <span class="detail-affection-button-sub">好感 +{{ normalGiftAffectionBonus }}</span>
                 <span class="detail-affection-button-owned">持有 {{ normalGiftCost.owned }}</span>
               </button>
               <button class="primary-button detail-affection-button" type="button" :disabled="!canSendPremiumGift" @click="sendPremiumGift">
                 <span class="detail-affection-button-main">
                   <span aria-hidden="true">{{ getItemIcon(premiumGiftCost.itemId) }}</span>
-                  <span>{{ currentPremiumGift }}</span>
+                  <span>{{ `${currentPremiumGift} x${premiumGiftCost.amount}` }}</span>
                 </span>
-                <span class="detail-affection-button-sub">所需 {{ premiumGiftCost.amount }} · 好感 +{{ premiumGiftAffectionBonus }}</span>
+                <span class="detail-affection-button-sub">好感 +{{ premiumGiftAffectionBonus }}</span>
                 <span class="detail-affection-button-owned">持有 {{ premiumGiftCost.owned }}</span>
               </button>
-            </div>
-
-            <div class="detail-affection-hints">
-              <span>{{ currentNormalGift }} 库存实时校验</span>
-              <span>{{ currentPremiumGift }} 库存实时校验</span>
             </div>
           </section>
         </div>

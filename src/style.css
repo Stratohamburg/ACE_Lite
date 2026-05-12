@@ -764,28 +764,21 @@ button {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  font-size: 12px;
 }
 
 .detail-affection-button-sub {
   display: block;
   margin-top: 4px;
-  font-size: 10px;
+  font-size: 9px;
   opacity: 0.82;
 }
 
 .detail-affection-button-owned {
   display: block;
   margin-top: 2px;
-  font-size: 10px;
+  font-size: 9px;
   color: rgba(142, 197, 255, 0.9);
-}
-
-.detail-affection-hints {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.55);
 }
 
 .attributes-grid {
