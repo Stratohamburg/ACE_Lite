@@ -4,82 +4,140 @@ import { GameConfigs } from '../data/configLoader'
 
 const activeSubTab = ref('gacha')
 
-const gachaCount = ref(0)
+const generatedCount = ref(0)
 const showResult = ref(false)
 const gachaResults = ref<any[]>([])
 const isAnimating = ref(false)
 
+const skillsPool = {
+  white: ['基础战术内存', '标准护甲图纸', '初级射击辅助', '常规行动日志', '通用恢复模块', '初级索敌芯片'],
+  yellow: ['高级战术核心', '稀有防弹材质', '特种医疗序列', '精锐突击插件'],
+  red: ['【起源】机能过载', '【终焉】绝对壁垒', '【星界】量子计算芯']
+}
+
+// 抽取一个胶囊的逻辑
+const generateCapsuleData = () => {
+  generatedCount.value++
+  let rarityColor = 'white'
+  
+  if (generatedCount.value % 36 === 0) {
+    rarityColor = 'red'
+  } else if (generatedCount.value % 18 === 0) {
+    rarityColor = 'yellow'
+  } else {
+    const rand = Math.random() * 100
+    // 期望概率 30次出红(约3.33%), 15次出黄(约6.66%)
+    if (rand < 3.33) rarityColor = 'red'
+    else if (rand < 10) rarityColor = 'yellow'
+    else rarityColor = 'white'
+  }
+
+  let pool = skillsPool.white
+  if (rarityColor === 'red') pool = skillsPool.red
+  else if (rarityColor === 'yellow') pool = skillsPool.yellow
+
+  const selectedName = pool[Math.floor(Math.random() * pool.length)]
+
+  return {
+    name: selectedName,
+    rarityText: rarityColor === 'red' ? '极品' : rarityColor === 'yellow' ? '稀有' : '普通',
+    color: rarityColor,
+    icon: rarityColor === 'red' ? '💿' : rarityColor === 'yellow' ? '📀' : '⚙️'
+  }
+}
+
+const gachaQueue = ref<any[]>([])
+
+const popNextNormal = () => {
+  if (gachaQueue.value.length === 0) {
+    gachaQueue.value.push(generateCapsuleData())
+  }
+  return gachaQueue.value.shift()
+}
+
 // 贩卖机内部的胶囊状态管理
-const machineCapsules = ref(Array.from({length: 16}, (_, i) => ({ id: i, hidden: false, restocking: false })))
+const machineCapsules = ref(Array.from({length: 16}, (_, i) => ({ 
+  id: i, 
+  hidden: false, 
+  restocking: false,
+  data: { name: '', rarityText: '', color: 'white', icon: '' }
+})))
+
+const checkAndBaitCapsules = (indicesToCheck: number[]) => {
+  const getScore = (c: string) => c === 'red' ? 2 : c === 'yellow' ? 1 : 0
+  let currentScore = machineCapsules.value.reduce((sum, cap) => sum + getScore(cap.data.color), 0)
+  
+  let safety = 0
+  // 保证卡池内总是有至少1红 或 2黄的视效展示（总价值>=2）
+  while (currentScore < 2 && safety < 50) {
+    safety++
+    let swapIdx = indicesToCheck.find(idx => machineCapsules.value[idx].data.color === 'white')
+    if (swapIdx === undefined) swapIdx = machineCapsules.value.findIndex(cap => cap.data.color === 'white')
+    if (swapIdx === -1) break
+
+    let futureIdx = gachaQueue.value.findIndex(c => getScore(c.color) > 0)
+    while (futureIdx === -1) {
+       gachaQueue.value.push(generateCapsuleData())
+       futureIdx = gachaQueue.value.findIndex(c => getScore(c.color) > 0)
+    }
+
+    const futureItem = gachaQueue.value.splice(futureIdx, 1)[0]
+    const currentItem = machineCapsules.value[swapIdx].data
+    
+    machineCapsules.value[swapIdx].data = futureItem
+    gachaQueue.value.unshift(currentItem)
+    
+    currentScore += getScore(futureItem.color) - getScore(currentItem.color)
+  }
+}
+
+// 初始写入
+for (let i = 0; i < 16; i++) machineCapsules.value[i].data = popNextNormal()
+checkAndBaitCapsules(Array.from({length: 16}, (_, i) => i))
+
 const capsuleEls = ref<HTMLElement[]>([])
 const machineRef = ref<HTMLElement | null>(null)
 const exitRef = ref<HTMLElement | null>(null)
 
 // 动态计算的掉落队列
-const activeDrops = ref<{id: number, style: any}[]>([])
+const activeDrops = ref<{id: number, style: any, color: string}[]>([])
 const droppedIndices = ref<number[]>([])
 
 const doGacha = async (times: number) => {
   if (isAnimating.value) return
   isAnimating.value = true
   
-  gachaCount.value += times
   gachaResults.value = []
   activeDrops.value = []
   droppedIndices.value = []
   
-  // -- 1. 计算抽卡结果 --
-  const pool = GameConfigs.gachaPool.filter(p => p.pool_id === 1)
-  const totalWeight = pool.reduce((sum, item) => sum + item.weight, 0)
-
-  for (let i = 0; i < times; i++) {
-    let forcedSSR = false
-    if ((gachaCount.value - times + i + 1) % 15 === 0) {
-      forcedSSR = true
-    }
-    
-    let selectedMaidId = pool[0].maid_id
-    if (forcedSSR) {
-      const ssrPool = pool.filter(p => {
-        const maid = GameConfigs.maids.find(m => m.id === p.maid_id)
-        return maid?.rarity === 'SSR'
-      })
-      if (ssrPool.length > 0) {
-        selectedMaidId = ssrPool[Math.floor(Math.random() * ssrPool.length)].maid_id
-      }
-    } else {
-      let rand = Math.random() * totalWeight
-      for (const item of pool) {
-        if (rand < item.weight) {
-          selectedMaidId = item.maid_id
-          break
-        }
-        rand -= item.weight
-      }
-    }
-    
-    const drawnMaid = GameConfigs.maids.find(m => m.id === selectedMaidId)
-    if (drawnMaid) {
-      gachaResults.value.push(drawnMaid)
-    }
-  }
-  
-  // -- 2. 依次分配物理掉落演出 --
-  // 如果机器里没那么多胶囊了，为了十连特效，直接强制全部可见
+  // -- 1. 寻找可抽取的胶囊 --
   let availableIdxs = machineCapsules.value.map((c, i) => c.hidden ? -1 : i).filter(i => i !== -1)
+  // 如果机器里没那么多胶囊了，强行补货以防万一
   if (availableIdxs.length < times) {
-    machineCapsules.value.forEach(c => { c.hidden = false; c.restocking = false })
+    machineCapsules.value.forEach(c => { 
+      if (c.hidden) {
+        c.data = popNextNormal()
+      }
+      c.hidden = false; 
+      c.restocking = false 
+    })
+    checkAndBaitCapsules(machineCapsules.value.map((_, i) => i))
     availableIdxs = machineCapsules.value.map((_, i) => i)
   }
 
-  // 随机打乱下标，取前 n 个作为本次要掉下来的坑位
+  // 随机打乱下标，取前 times 个作为本次要掉下来的坑位
   let sequenceIdxs = availableIdxs.sort(() => Math.random() - 0.5).slice(0, times)
   droppedIndices.value = sequenceIdxs
 
   for (let i = 0; i < times; i++) {
+    const dropIdx = sequenceIdxs[i]
+    // 提前计算好抽取结果
+    const capData = machineCapsules.value[dropIdx].data
+    gachaResults.value.push(capData)
+
     // 设置阶梯延迟，每过200ms掉落一颗
     setTimeout(() => {
-      const dropIdx = sequenceIdxs[i]
       let style: any = {}
       
       if (machineRef.value && exitRef.value && capsuleEls.value[dropIdx]) {
@@ -104,7 +162,7 @@ const doGacha = async (times: number) => {
       }
       
       // 生成一个实体并隐藏原橱窗里的胶囊
-      activeDrops.value.push({ id: Math.random(), style })
+      activeDrops.value.push({ id: Math.random(), style, color: capData.color })
       machineCapsules.value[dropIdx].hidden = true
 
     }, i * 200)
@@ -121,6 +179,13 @@ const doGacha = async (times: number) => {
 
 const closeResult = () => {
   showResult.value = false
+  
+  // 更新新胶囊数据并触发钓鱼逻辑
+  droppedIndices.value.forEach(idx => {
+    machineCapsules.value[idx].data = popNextNormal()
+  })
+  checkAndBaitCapsules(droppedIndices.value)
+
   // 对所有掉出去的胶囊排队播回弹补位动画
   droppedIndices.value.forEach((idx, i) => {
     setTimeout(() => {
@@ -145,7 +210,7 @@ const closeResult = () => {
     </header>
 
     <div class="sub-tabs">
-      <button :class="{active: activeSubTab === 'gacha'}" @click="activeSubTab = 'gacha'">女仆贩卖机</button>
+      <button :class="{active: activeSubTab === 'gacha'}" @click="activeSubTab = 'gacha'">技能贩卖机</button>
       <button :class="{active: activeSubTab === 'daily'}" @click="activeSubTab = 'daily'">每日精选</button>
       <button :class="{active: activeSubTab === 'items'}" @click="activeSubTab = 'items'">道具商城</button>
       <button :class="{active: activeSubTab === 'gift'}" @click="activeSubTab = 'gift'">礼包中心</button>
@@ -159,23 +224,24 @@ const closeResult = () => {
             v-for="drop in activeDrops" 
             :key="drop.id" 
             class="capsule animated-drop" 
+            :class="drop.color"
             :style="drop.style"
-          >🎁</div>
+          >?</div>
 
-          <div class="machine-banner">【当前卡池：限定机械女仆 - 概率UP!】</div>
+          <div class="machine-banner">【当前卡池：限定极品技能 - 概率UP!】</div>
           <div class="machine-viewport">
             <div 
               class="capsule" 
               v-for="(cap, i) in machineCapsules" 
               :key="cap.id"
               ref="capsuleEls"
-              :class="{ 'invisible': cap.hidden, 'restocking': cap.restocking }"
+              :class="[cap.data.color, { 'invisible': cap.hidden, 'restocking': cap.restocking }]"
             >?</div>
           </div>
           <div class="machine-exit">
             <div class="exit-hole" ref="exitRef"></div>
           </div>
-          <div class="gacha-pity">保底提示: 再抽 {{ Math.max(0, 15 - (gachaCount % 15)) }} 次必得SSR级女仆</div>
+          <div class="gacha-pity">保底: 18抽必出稀有(黄)，36抽必出极品(红)</div>
           <div class="gacha-actions">
             <button class="gacha-btn single" :class="{disabled: isAnimating}" @click="doGacha(1)">
               <div class="title">投币 1次</div>
@@ -204,12 +270,12 @@ const closeResult = () => {
     <!-- 抽卡结果弹窗 -->
     <div class="gacha-overlay" v-if="showResult" @click="closeResult">
       <div class="gacha-result-panel" @click.stop>
-        <h3 class="result-title">抽取结果</h3>
+        <h3 class="result-title">获取技能</h3>
         <div class="result-grid">
-          <div class="result-item" v-for="(maid, index) in gachaResults" :key="index" :class="maid.rarity.toLowerCase()">
-            <div class="rarity-badge">{{ maid.rarity }}</div>
-            <div class="maid-icon">🎀</div>
-            <div class="maid-name">{{ maid.name }}</div>
+          <div class="result-item" v-for="(skill, index) in gachaResults" :key="index" :class="skill.color">
+            <div class="rarity-badge">{{ skill.rarityText }}</div>
+            <div class="maid-icon">{{ skill.icon }}</div>
+            <div class="maid-name">{{ skill.name }}</div>
           </div>
         </div>
         <button class="confirm-btn" @click="closeResult">确定</button>
@@ -305,7 +371,11 @@ const closeResult = () => {
   align-content: center; 
   padding: 16px;
 }
-.capsule { width: 36px; height: 36px; background: linear-gradient(135deg, #ff9a9e, #fecfef); border-radius: 50%; color: #000; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 16px; }
+.capsule { width: 36px; height: 36px; border-radius: 50%; color: #000; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 16px; }
+.capsule.red { background: linear-gradient(135deg, #ff4d4f, #ff7875); color: #fff; box-shadow: 0 0 8px rgba(255,77,79,0.8); }
+.capsule.yellow { background: linear-gradient(135deg, #ffd700, #ffec3d); }
+.capsule.white { background: linear-gradient(135deg, #e0e0e0, #f5f5f5); }
+
 .capsule.invisible { opacity: 0; visibility: hidden; }
 .capsule.restocking { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 
@@ -355,17 +425,17 @@ const closeResult = () => {
   display: flex; flex-direction: column; align-items: center; padding: 8px 4px;
   position: relative; overflow: hidden;
 }
-.result-item.ssr { border-color: #ffd700; box-shadow: 0 0 10px rgba(255,215,0,0.5); }
-.result-item.sr { border-color: #a020f0; box-shadow: 0 0 8px rgba(160,32,240,0.5); }
-.result-item.r { border-color: #4facfe; }
+.result-item.red { border-color: #ff4d4f; box-shadow: 0 0 10px rgba(255,77,79,0.5); }
+.result-item.yellow { border-color: #ffd700; box-shadow: 0 0 8px rgba(255,215,0,0.5); }
+.result-item.white { border-color: #e0e0e0; }
 
 .rarity-badge {
   position: absolute; top: 0; left: 0; font-size: 10px; font-weight: bold;
   padding: 2px 4px; background: rgba(0,0,0,0.6); border-bottom-right-radius: 4px;
 }
-.result-item.ssr .rarity-badge { color: #ffd700; }
-.result-item.sr .rarity-badge { color: #da70d6; }
-.result-item.r .rarity-badge { color: #4facfe; }
+.result-item.red .rarity-badge { color: #ff4d4f; }
+.result-item.yellow .rarity-badge { color: #ffd700; }
+.result-item.white .rarity-badge { color: #e0e0e0; }
 
 .maid-icon { font-size: 24px; margin: 8px 0; }
 .maid-name { font-size: 10px; text-align: center; font-weight: bold; white-space: nowrap; }

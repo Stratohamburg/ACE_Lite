@@ -614,13 +614,13 @@ button {
 
 .detail-sheet {
   position: absolute;
-  inset: 72px 16px 16px;
+  inset: 60px 12px 12px;
   display: grid;
   grid-template-rows: auto auto auto 1fr;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 12px;
   border: 1px solid rgba(255, 240, 220, 0.12);
-  border-radius: 26px;
+  border-radius: 20px;
   background: linear-gradient(180deg, rgba(29, 23, 21, 0.96), rgba(15, 12, 13, 0.98));
   overflow: hidden;
 }
@@ -634,7 +634,7 @@ button {
 
 .detail-header h3 {
   margin: 4px 0 0;
-  font-size: 24px;
+  font-size: 20px;
 }
 
 .detail-hero {
@@ -642,9 +642,9 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  min-height: 160px;
-  padding: 18px;
-  border-radius: 22px;
+  min-height: 120px;
+  padding: 12px;
+  border-radius: 16px;
   overflow: hidden;
 }
 
@@ -796,13 +796,13 @@ button {
     --sidebar-width: 280px;
   }
 }
- . m a i d - r o l e   { 
-     o p a c i t y :   0 . 8 5 ; 
-     f o n t - s i z e :   1 1 p x ; 
- } 
- 
- 
- 
+.maid-role {
+  opacity: 0.85;
+  font-size: 11px;
+}
+
+
+
 /* 垂直时间线样式 */
 .timeline-container {
   display: flex;
@@ -824,31 +824,37 @@ button {
   position: relative;
 }
 .timeline-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   border: 2px solid rgba(255,255,255,0.8);
   z-index: 2;
-  margin-top: 14px;
+  margin-top: 10px;
   box-shadow: 0 0 4px rgba(0,0,0,0.5);
 }
 .timeline-line {
-  width: 2px;
-  background: rgba(255,255,255,0.15);
+  width: 0px;
+  border-left: 2px solid rgba(255,255,255,0.3);
   position: absolute;
-  top: 26px;
-  bottom: -14px;
+  top: 22px;
+  bottom: -10px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1;
+}
+.current-node .timeline-line,
+.future-node .timeline-line {
+  border-left-style: dashed;
+  border-left-color: rgba(255,255,255,0.15);
 }
 .timeline-node:last-child .timeline-line {
   display: none;
 }
 .timeline-card {
   flex-grow: 1;
-  margin-bottom: 16px;
-  padding: 12px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 12px;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 .timeline-node.is-locked .timeline-card {
